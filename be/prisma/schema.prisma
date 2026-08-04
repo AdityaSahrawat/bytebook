@@ -1,0 +1,51 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Side {
+  BUY
+  SELL
+}
+
+enum Type {
+  LIMIT
+  MARKET
+}
+
+enum Status {
+  OPEN
+  PARTIALLY_FILLED
+  FILLED
+  CANCELLED
+}
+
+model Order {
+  id                String   @id @default(uuid())
+  side              Side
+  type              Type
+  price             Float    @default(0.0)
+  originalQuantity  Float
+  remainingQuantity Float
+  status            Status   @default(OPEN)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([status])
+  @@index([side, status])
+}
+
+model Trade {
+  id          String   @id @default(uuid())
+  buyOrderId  String
+  sellOrderId String
+  price       Float
+  quantity    Float
+  executedAt  DateTime @default(now())
+
+  @@index([executedAt])
+}

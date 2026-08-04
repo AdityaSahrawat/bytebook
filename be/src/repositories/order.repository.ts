@@ -2,6 +2,9 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../db/prisma';
 import { Order, Trade, MatchingResult, MarketStats, Status, Side, Type } from '../types';
 
+type PrismaOrder = Awaited<ReturnType<typeof prisma.order.findMany>>[number];
+type PrismaTrade = Awaited<ReturnType<typeof prisma.trade.findMany>>[number];
+
 export class OrderRepository {
   /**
    * Persist pure MatchingResult into PostgreSQL atomically via Prisma Transaction.
@@ -105,7 +108,7 @@ export class OrderRepository {
       },
     });
 
-    return records.map((r: { id: string; side: Side; type: Type; price: number; originalQuantity: number; remainingQuantity: number; status: Status; createdAt: Date; updatedAt: Date }) => ({
+    return records.map((r: PrismaOrder) => ({
       id: r.id,
       side: r.side as unknown as Side,
       type: r.type as unknown as Type,
@@ -129,7 +132,7 @@ export class OrderRepository {
       },
     });
 
-    return records.map((r: { id: string; buyOrderId: string; sellOrderId: string; price: number; quantity: number; executedAt: Date }) => ({
+    return records.map((r: PrismaTrade) => ({
       id: r.id,
       buyOrderId: r.buyOrderId,
       sellOrderId: r.sellOrderId,

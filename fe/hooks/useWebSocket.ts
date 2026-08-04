@@ -11,10 +11,22 @@ export function useWebSocket(onEvent?: WSEventCallback) {
   const [isConnected, setIsConnected] = useState(false);
   const [lastSequence, setLastSequence] = useState<number | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
   const callbackRef = useRef(onEvent);
   callbackRef.current = onEvent;
 
   const connect = useCallback(() => {
+    // Clear any pending reconnect timer
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+
+    // Close existing socket if open
+    if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
     try {
       const ws = new WebSocket(WS_URL);
 
@@ -44,29 +56,42 @@ export function useWebSocket(onEvent?: WSEventCallback) {
         }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (evt) => {
         setIsConnected(false);
-        console.log('⚡ Disconnected from WebSocket stream. Reconnecting in 3s...');
-        setTimeout(connect, 3000);
+        // Only attempt reconnect if closed cleanly by server/drop, not by unmount
+        if (evt.wasClean === false || evt.code !== 1000) {
+          reconnectTimerRef.current = setTimeout(() => {
+            connect();
+          }, 3000);
+        }
       };
 
       ws.onerror = (err) => {
-        console.error('WebSocket error:', err);
-        ws.close();
+        if (ws.readyState === WebSocket.OPEN) {
+          console.error('WebSocket error:', err);
+        }
       };
 
       wsRef.current = ws;
     } catch (err) {
       console.error('Failed to initialize WebSocket:', err);
-      setTimeout(connect, 3000);
+      reconnectTimerRef.current = setTimeout(() => {
+        connect();
+      }, 3000);
     }
   }, []);
 
   useEffect(() => {
     connect();
+
     return () => {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
       if (wsRef.current) {
-        wsRef.current.close();
+        // Code 1000 = Normal Closure on unmount
+        wsRef.current.close(1000, 'Component unmounted');
+        wsRef.current = null;
       }
     };
   }, [connect]);

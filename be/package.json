@@ -1,5 +1,5 @@
 {
-  "name": "be",
+  "name": "backend",
   "version": "1.0.0",
   "description": "ByteVox Order Matching Engine & Trading API",
   "main": "dist/index.js",
@@ -11,6 +11,9 @@
     "test:watch": "vitest",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",
