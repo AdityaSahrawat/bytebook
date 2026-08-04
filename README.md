@@ -8,7 +8,7 @@ ByteVox is a production-quality, high-performance **Price-Time Priority Order Ma
 
 - 🎯 **Clean Layered Architecture**: Strict separation of concerns (Presentation, Application, Domain, Persistence). The domain matching engine has zero dependencies on web frameworks or databases.
 - ⚡ **Price-Time Priority Engine**: Maintains `Bids` (highest price first) and `Asks` (lowest price first) with FIFO queues for identical price levels.
-- 🚀 **Fast $O(1)$ Order Cancellation**: Uses an in-memory `orderIndex: Map<orderId, OrderReference>` pointer lookup for $O(1)$ order removal without linear scanning.
+- 🚀 **Fast $O(1)$ Order Lookup**: Uses an in-memory `orderIndex: Map<orderId, OrderReference>` pointer lookup for instant order cancellation without linear scanning.
 - 🔒 **Single-Writer Serial Mutex**: Solves concurrency race conditions by executing matching operations inside an `AsyncMutex` critical section.
 - 🛡️ **Atomic Database Transactions**: State updates (`incomingOrder`, `updatedOrders`, `createdTrades`, `cancelledOrders`) commit atomically in a single Prisma transaction (`$transaction`).
 - 🔢 **Arbitrary Decimal Math**: Uses `decimal.js` to prevent IEEE-754 floating point representation bugs (`0.1 + 0.2`).
@@ -73,7 +73,7 @@ ByteVox is a production-quality, high-performance **Price-Time Priority Order Ma
 | `GET` | `/api/trades?limit=50` | Fetch executed trades history (newest first) |
 | `GET` | `/api/stats` | Fetch market metrics (open bids, open asks, executed trades, total volume) |
 | `GET` | `/api/orders/open` | Fetch active resting market orders |
-| `DELETE`| `/api/orders/:id` | Cancel an active open order in $O(1)$ time |
+| `DELETE`| `/api/orders/:id` | Cancel an active open order |
 
 ---
 
@@ -99,12 +99,24 @@ All real-time WebSocket messages broadcasted on `ws://localhost:3001/ws` follow 
 
 ### Option 1: One-Command Setup via Docker Compose
 
+#### Running from Project Root:
 ```bash
 # Launch PostgreSQL, Backend, and Frontend containers
-docker-compose up --build
+docker compose up --build
 ```
 
-- **Frontend Dashboard**: `http://localhost:3000`
+#### Running from Inside `be` Directory:
+```bash
+cd be
+
+# Run Docker Compose specifying root docker-compose file
+docker compose -f ../docker-compose.yml up --build
+
+# Or return to root and run:
+cd .. && docker compose up --build
+```
+
+- **Frontend Dashboard**: `http://localhost:3002` (or `http://localhost:3000`)
 - **Backend API**: `http://localhost:3001`
 - **WebSocket Stream**: `ws://localhost:3001/ws`
 
@@ -112,14 +124,16 @@ docker-compose up --build
 
 ### Option 2: Local Development Setup
 
-#### 1. Backend Setup
+#### 1. Backend Setup (`be/`)
 ```bash
 cd be
 
 # Install dependencies
 npm install
 
-# Start PostgreSQL database (or set DATABASE_URL in .env)
+# Start PostgreSQL database (via Docker or local Postgres)
+docker compose -f ../docker-compose.yml up postgres -d
+
 # Push Prisma database schema
 npx prisma db push
 
@@ -130,7 +144,7 @@ npm test
 npm run dev
 ```
 
-#### 2. Frontend Setup
+#### 2. Frontend Setup (`fe/`)
 ```bash
 cd fe
 
@@ -148,5 +162,5 @@ npm run dev
 Explore the technical design documentation in the `docs/` folder:
 
 1. 🏛️ **[docs/architecture.md](docs/architecture.md)** — Layered separation of concerns, request lifecycle, and Prisma transaction boundaries.
-2. ⚡ **[docs/matching-engine.md](docs/matching-engine.md)** — Price-Time priority rules, $O(1)$ order index, Limit vs Market orders, and precision arithmetic.
+2. ⚡ **[docs/matching-engine.md](docs/matching-engine.md)** — Price-Time priority rules, order index lookup, Limit vs Market orders, and precision arithmetic.
 3. 🚀 **[docs/scaling.md](docs/scaling.md)** — Interview Q&A trade-off analysis (Heap vs Map, Mutex vs Row Lock) and horizontal scaling strategy (symbol sharding, Redis Pub/Sub, Kafka streaming).
