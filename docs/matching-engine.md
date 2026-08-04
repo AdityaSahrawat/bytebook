@@ -1,6 +1,6 @@
 # ByteVox Matching Engine Specification
 
-This document provides a deep technical breakdown of the **ByteVox Matching Engine** data structures, price-time priority execution, and trade execution rules.
+This document provides a deep technical breakdown of the **ByteVox Matching Engine** data structures, price-time priority execution, trade execution rules, and trade-offs.
 
 ---
 
@@ -15,6 +15,12 @@ The ByteVox matching engine enforces strict **Price-Time Priority**:
 2. **Time Priority (FIFO)**:
    - Orders at the exact same price level are placed in a **FIFO Queue** (First-In, First-Out).
    - Earliest arriving order (`createdAt` timestamp) is matched first.
+
+---
+
+## ❓ Why Not Use SQL For Matching?
+
+> Although matching could theoretically be implemented with SQL queries and `ORDER BY` clauses, repeatedly scanning and updating the database would introduce massive latency and locking contention. Instead, ByteVox maintains an in-memory runtime order book optimized for matching while PostgreSQL provides durable persistence, recovery, and auditability.
 
 ---
 
@@ -42,10 +48,12 @@ export interface OrderReference {
 - **`asks`**: `Map<number, PriceLevel>` + Array of prices sorted **Ascending**.
 - **`orderIndex`**: `Map<string, OrderReference>` mapping `orderId` directly to its containing `PriceLevel` and `Order` reference.
 
-### Complexity Rationale
+### Algorithmic Complexity Rationale
 - **Price Level Lookup**: $O(1)$ via Hash Map.
 - **Top Price Level Peek**: $O(1)$ from sorted price array head.
-- **Order Cancellation**: **$O(1)$** lookup via `orderIndex` map without linear scanning.
+- **Order Lookup**: **$O(1)$** via `orderIndex` (`Map<string, OrderReference>`).
+- **Order Queue Removal**: $O(k)$ where $k$ is the number of orders resting at that specific price level (since $k \ll N$, this is practically instantaneous). *Note: True $O(1)$ queue removal requires a doubly linked list + `Map<OrderId, LinkedListNode>`, which would add pointer complexity.*
+- **Sorted Price Array Insertion**: Maintaining sorted price levels has $O(P)$ insertion due to array shifting (where $P$ is the number of active price levels), which simplifies cancellation and debuggability compared to a binary heap.
 - **Aggregated Order Book API**: $O(L)$ where $L$ is requested depth ($20$ levels default).
 
 ---
